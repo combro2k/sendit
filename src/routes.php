@@ -21,23 +21,22 @@ $app->post('/', function (Request $request, Response $response, array $args) use
   $timestamp = time();
 
   foreach ($files as $file) {
-    $uniqString = json_encode([
+    $uniqString = [
       'timestamp' => $timestamp,
       'ipAddress' => $ipAddress,
       'filename' => $file->getClientFilename(),
       'description' => $request->getParam('description'),
-    ]);
+    ];
 
-    var_export($uniqString);
-
-    $uuid = Uuid::uuid5(Uuid::NAMESPACE_DNS, $uniqString);
+    $uuid = Uuid::uuid5(Uuid::NAMESPACE_DNS, json_encode($uniqString));
 
     if (!empty($uniqString['filename'])) {
-      $file->moveTo("{$storePath}/${uuid}.upload");
+      $file->moveTo("{$storePath}/${uuid}.data");
     }
-    else {
-      echo file_put_contents("{$storePath}/${uuid}.text", $uniqString);
-    }
+    
+    file_put_contents("{$storePath}/${uuid}.text", json_encode($uniqString));
+
+    $args['uuid'][] = $uuid;
   } 
 
   return $this->renderer->render($response, 'index.phtml', $args);
@@ -46,15 +45,24 @@ $app->post('/', function (Request $request, Response $response, array $args) use
 $app->get('/{uuid}', function (Request $request, Response $response, array $args) use ($storePath, $app) {
   $uuid = $args['uuid'];
 
-  $uploadTarget = "{$storePath}/{$uuid}.upload";
+  $uploadTarget = "{$storePath}/{$uuid}.data";
   $textTarget = "{$storePath}/{$uuid}.text";
 
   if (!file_exists($uploadTarget) && !file_exists($textTarget)) {
     return $response->withRedirect('/', 302);
   } 
 
-  // Render index view
-  return $this->renderer->render($response, 'download.phtml', [
-    'uuid' => $uuid,
-  ]);
+  if (file_exists($textTarget)) {
+    $resp = $response->withHeader('Content-type', 'application/json');
+    $body = $resp->getBody();
+    $body->write(file_get_contents($textTarget));
+  }
+
+  if (file_exists($uploadTarget)) {
+    $resp = $response->withHeader('Content-type', 'application/json');
+
+    $body = $resp->getBody();
+    $body->write(file_get_contents($uploadTarget));
+  }
+
 });

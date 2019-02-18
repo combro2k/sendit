@@ -1,3 +1,7 @@
+<?php foreach ($uuid as $id): ?>
+<?= $id ?><br/>
+<?php endforeach; ?>
+<br/>
 <form method='POST' name='upload' enctype="multipart/form-data">
   <input type='file' name='file' /><br/>
   <input type='text' name='description' /><br/>
