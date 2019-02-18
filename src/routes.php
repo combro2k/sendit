@@ -3,28 +3,58 @@
 use Slim\Http\Request;
 use Slim\Http\Response;
 
+use Ramsey\Uuid\Uuid;
+use Ramsey\Uuid\Exception\UnsatisfiedDependencyException;
+
 // Routes
+
+$storePath = '/data/store';
 
 $app->get('/', function (Request $request, Response $response) {
   return $this->renderer->render($response, 'index.phtml');
 });
 
-$app->post('/', function (Request $request, Response $response, array $args) {
+$app->post('/', function (Request $request, Response $response, array $args) use ($storePath) {
   $files = $request->getUploadedFiles();
 
-  var_dump($files);
+  $ipAddress = $request->getAttribute('ip_address');
+  $timestamp = time();
+
+  foreach ($files as $file) {
+    $uniqString = json_encode([
+      'timestamp' => $timestamp,
+      'ipAddress' => $ipAddress,
+      'filename' => $file->getClientFilename(),
+      'description' => $request->getParam('description'),
+    ]);
+
+    var_export($uniqString);
+
+    $uuid = Uuid::uuid5(Uuid::NAMESPACE_DNS, $uniqString);
+
+    if (!empty($uniqString['filename'])) {
+      $file->moveTo("{$storePath}/${uuid}.upload");
+    }
+    else {
+      echo file_put_contents("{$storePath}/${uuid}.text", $uniqString);
+    }
+  } 
 
   return $this->renderer->render($response, 'index.phtml', $args);
 });
 
-$app->get('/{uuid}', function (Request $request, Response $response, array $args) {
-  // Sample log message
-  $this->logger->info("Slim-Skeleton '/' route");
+$app->get('/{uuid}', function (Request $request, Response $response, array $args) use ($storePath, $app) {
+  $uuid = $args['uuid'];
 
-  if (array_key_exists('uuid', $args)) {
-    print_r(getcwd());
-  }
+  $uploadTarget = "{$storePath}/{$uuid}.upload";
+  $textTarget = "{$storePath}/{$uuid}.text";
+
+  if (!file_exists($uploadTarget) && !file_exists($textTarget)) {
+    return $response->withRedirect('/', 302);
+  } 
 
   // Render index view
-  return $this->renderer->render($response, 'download.phtml', $args);
+  return $this->renderer->render($response, 'download.phtml', [
+    'uuid' => $uuid,
+  ]);
 });

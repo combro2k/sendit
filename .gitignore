@@ -1,3 +1,5 @@
 /vendor/
 /logs/*
+/store/*
+!/store/.gitkeep
 !/logs/README.md
